@@ -1,0 +1,338 @@
+"use client";
+
+import { useRef, useState, useEffect } from "react";
+import {
+    ChevronLeft,
+    ChevronRight,
+    Flag,
+    Plus,
+    X,
+    MessageCircle,
+    ArrowRight,
+    Camera
+} from "lucide-react";
+import { SCHEDULE_HOURS, DEFAULT_CATEGORIES, MENTOR_TASKS, USER_PROFILE } from "@/constants/mockData";
+import TaskDetailModal from "@/components/TaskDetailModal";
+import Header from "@/components/layout/Header";
+import PlannerTasks from "@/components/planner/PlannerTasks";
+import StudyTimeline from "@/components/planner/StudyTimeline";
+
+export default function PlannerPage() {
+    const [currentDate, setCurrentDate] = useState(new Date(2026, 1, 2)); // Feb 2, 2026
+    const [selectedCategoryId, setSelectedCategoryId] = useState(DEFAULT_CATEGORIES[0].id);
+    const [selectedGridCategoryId, setSelectedGridCategoryId] = useState(DEFAULT_CATEGORIES[0].id);
+
+    // Submission Modal State
+    const [isSubmissionOpen, setIsSubmissionOpen] = useState(false);
+    const [submittingTask, setSubmittingTask] = useState<any>(null);
+    const [studyPhoto, setStudyPhoto] = useState<string | null>(null);
+    const [studyNote, setStudyNote] = useState("");
+    const submissionFileInputRef = useRef<HTMLInputElement>(null);
+
+    // Grid state
+    const [studyTimeBlocks, setStudyTimeBlocks] = useState<{ [key: string]: string }>({
+        "09:00": "korean", "09:10": "korean", "09:20": "korean",
+        "10:30": "english", "10:40": "english", "10:50": "english", "11:00": "english",
+        "14:10": "math", "14:20": "math", "14:30": "math", "14:40": "math", "14:50": "math",
+        "20:00": "explore", "20:10": "explore", "20:20": "explore"
+    });
+
+    // Unified Tasks State
+    const [tasks, setTasks] = useState<any[]>([]);
+    const [newTaskTitle, setNewTaskTitle] = useState("");
+
+    // Task Detail Modal State
+    const [selectedTask, setSelectedTask] = useState<any>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
+    const isSameDay = (date1: Date, date2: Date) => {
+        return date1.getDate() === date2.getDate() &&
+            date1.getMonth() === date2.getMonth() &&
+            date1.getFullYear() === date2.getFullYear();
+    };
+
+    useEffect(() => {
+        const initialMentorTasks = MENTOR_TASKS
+            .filter(t => t.deadline && isSameDay(t.deadline, currentDate))
+            .map(t => ({ ...t, isMentorTask: true, completed: t.status === 'feedback_completed', timeSpent: 0, isRunning: false, studyRecord: null }));
+
+        const initialUserTasks = [
+            { id: 'u1', title: "국어 문학 3지문", categoryId: "korean", completed: false, timeSpent: 0, isRunning: false, isMentorTask: false, studyRecord: null },
+            { id: 'u2', title: "수학 수1 등차수열", categoryId: "math", completed: false, timeSpent: 0, isRunning: false, isMentorTask: false, studyRecord: null }
+        ];
+
+        setTasks([...initialMentorTasks, ...initialUserTasks]);
+    }, [currentDate]);
+
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        const runningTask = tasks.find(task => task.isRunning);
+
+        if (runningTask) {
+            interval = setInterval(() => {
+                setTasks(prevTasks =>
+                    prevTasks.map(task =>
+                        task.isRunning
+                            ? { ...task, timeSpent: task.timeSpent + 1 }
+                            : task
+                    )
+                );
+
+                const now = new Date();
+                const hh = String(now.getHours()).padStart(2, '0');
+                const mm = String(Math.floor(now.getMinutes() / 10) * 10).padStart(2, '0');
+                const timeKey = `${hh}:${mm}`;
+
+                setStudyTimeBlocks(prev => {
+                    if (prev[timeKey] !== runningTask.categoryId) {
+                        return { ...prev, [timeKey]: runningTask.categoryId };
+                    }
+                    return prev;
+                });
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [tasks]);
+
+    const handlePrevDay = () => {
+        const prev = new Date(currentDate);
+        prev.setDate(prev.getDate() - 1);
+        setCurrentDate(prev);
+    };
+
+    const handleNextDay = () => {
+        const next = new Date(currentDate);
+        next.setDate(next.getDate() + 1);
+        setCurrentDate(next);
+    };
+
+    const toggleTimeBlock = (hour: string, slotIndex: number) => {
+        const minute = slotIndex * 10;
+        const timeKey = `${hour}:${minute < 10 ? '0' + minute : minute}`;
+
+        setStudyTimeBlocks(prev => {
+            const newBlocks = { ...prev };
+            if (newBlocks[timeKey] === selectedGridCategoryId) {
+                delete newBlocks[timeKey];
+            } else {
+                newBlocks[timeKey] = selectedGridCategoryId;
+            }
+            return newBlocks;
+        });
+    };
+
+    const addTask = () => {
+        if (!newTaskTitle.trim()) return;
+        const newTask = {
+            id: Date.now(),
+            title: newTaskTitle,
+            categoryId: selectedCategoryId,
+            completed: false,
+            timeSpent: 0,
+            isRunning: false,
+            isMentorTask: false,
+            studyRecord: null
+        };
+        setTasks([...tasks, newTask]);
+        setNewTaskTitle("");
+    };
+
+    const toggleTaskCompletion = (taskId: number | string) => {
+        setTasks(prev => prev.map(task =>
+            task.id === taskId ? { ...task, completed: !task.completed } : task
+        ));
+    };
+
+    const toggleTaskTimer = (taskId: number | string) => {
+        setTasks(prev => prev.map(task => {
+            if (task.id === taskId) return { ...task, isRunning: !task.isRunning };
+            return { ...task, isRunning: false };
+        }));
+    };
+
+    const deleteTask = (taskId: number | string) => {
+        setTasks(prev => prev.filter(task => task.id !== taskId));
+    };
+
+    const handleOpenSubmission = (task: any) => {
+        setSubmittingTask(task);
+        setStudyNote(task.studyRecord?.note || "");
+        setStudyPhoto(task.studyRecord?.photo || null);
+        setIsSubmissionOpen(true);
+    };
+
+    const handleSubmissionImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const imageUrl = URL.createObjectURL(file);
+            setStudyPhoto(imageUrl);
+        }
+    };
+
+    const saveSubmission = () => {
+        setTasks(prev => prev.map(task => {
+            if (task.id === submittingTask.id) {
+                return {
+                    ...task,
+                    studyRecord: { photo: studyPhoto, note: studyNote },
+                    status: 'submitted'
+                };
+            }
+            return task;
+        }));
+        setIsSubmissionOpen(false);
+    };
+
+    return (
+        <div className="bg-gray-50">
+            <Header title="학습 플래너 📝" showIcons={false} />
+
+            {/* Date Navigator */}
+            <section className="bg-white border-b border-gray-100 px-4 py-3 mb-4">
+                <div className="flex items-center justify-between">
+                    <button onClick={handlePrevDay} className="p-2 hover:bg-gray-50 rounded-full transition-colors text-gray-400">
+                        <ChevronLeft size={20} />
+                    </button>
+                    <div className="flex items-center gap-2">
+                        <h2 className="text-lg font-bold text-gray-800">
+                            {currentDate.getMonth() + 1}월 {currentDate.getDate()}일 ({['일', '월', '화', '수', '목', '금', '토'][currentDate.getDay()]})
+                        </h2>
+                        <span className="bg-blue-100 text-blue-600 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            D-{USER_PROFILE.dDay}
+                        </span>
+                    </div>
+                    <button onClick={handleNextDay} className="p-2 hover:bg-gray-50 rounded-full transition-colors text-gray-400">
+                        <ChevronRight size={20} />
+                    </button>
+                </div>
+            </section>
+
+            <div className="px-4 space-y-4 pb-8">
+                {/* Mentee Comment Card */}
+                <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                        <Flag size={18} className="text-orange-500 fill-orange-500" />
+                    </div>
+                    <div className="flex-1">
+                        <p className="text-[10px] font-bold text-gray-400 mb-1">멘티 코멘트</p>
+                        <input
+                            type="text"
+                            placeholder="오늘 하루 요약이나 코멘트를 남겨주세요"
+                            className="w-full text-sm placeholder-gray-300 border-none p-0 focus:ring-0 font-medium"
+                        />
+                    </div>
+                </div>
+
+
+                <PlannerTasks
+                    tasks={tasks}
+                    onToggleCompletion={toggleTaskCompletion}
+                    onToggleTimer={toggleTaskTimer}
+                    onDelete={deleteTask}
+                    onOpenSubmission={handleOpenSubmission}
+                    newTaskTitle={newTaskTitle}
+                    setNewTaskTitle={setNewTaskTitle}
+                    selectedCategoryId={selectedCategoryId}
+                    setSelectedCategoryId={setSelectedCategoryId}
+                    onAddTask={addTask}
+                />
+
+                <StudyTimeline
+                    selectedGridCategoryId={selectedGridCategoryId}
+                    onSetSelectedGridCategoryId={setSelectedGridCategoryId}
+                    studyTimeBlocks={studyTimeBlocks}
+                    onToggleTimeBlock={toggleTimeBlock}
+                />
+            </div>
+
+            <TaskDetailModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                task={selectedTask}
+            />
+
+            {/* Study Record Submission Modal */}
+            {isSubmissionOpen && submittingTask && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center px-6">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsSubmissionOpen(false)} />
+                    <div className="relative w-full max-w-sm bg-white rounded-[32px] overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300">
+                        <div className="px-6 pt-8 pb-4 flex justify-between items-center bg-white border-b border-gray-50">
+                            <div>
+                                <h3 className="text-lg font-black text-gray-900">공부 기록 제출</h3>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5 tracking-widest">Mentor Feed Loop</p>
+                            </div>
+                            <button onClick={() => setIsSubmissionOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-6">
+                            <div className="flex flex-col items-center">
+                                <div className="relative w-full aspect-video bg-gray-50 rounded-[24px] border border-gray-100 overflow-hidden group cursor-pointer" onClick={() => submissionFileInputRef.current?.click()}>
+                                    {studyPhoto ? (
+                                        <img src={studyPhoto} alt="study-proof" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-gray-300 group-hover:text-primary transition-colors">
+                                                <Camera size={24} />
+                                            </div>
+                                            <p className="text-[11px] font-bold text-gray-400">공부 사진 올리기</p>
+                                        </div>
+                                    )}
+                                    <input
+                                        type="file"
+                                        ref={submissionFileInputRef}
+                                        className="hidden"
+                                        accept="image/*"
+                                        onChange={handleSubmissionImageUpload}
+                                    />
+                                </div>
+                                {studyPhoto && (
+                                    <button
+                                        onClick={() => setStudyPhoto(null)}
+                                        className="text-[10px] text-red-500 font-bold mt-2 hover:underline"
+                                    >
+                                        사진 삭제하기
+                                    </button>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">오늘의 배움/느낀점</label>
+                                <textarea
+                                    rows={3}
+                                    value={studyNote}
+                                    onChange={(e) => setStudyNote(e.target.value)}
+                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none resize-none placeholder-gray-300"
+                                    placeholder="오늘 공부하며 어려웠던 점이나 새로 알게 된 사실을 적어주세요."
+                                />
+                            </div>
+
+                            {submittingTask.mentorFeedback && (
+                                <div className="bg-primary/5 rounded-2xl p-4 border border-primary/10">
+                                    <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                                        <MessageCircle size={10} fill="currentColor" />
+                                        Mentor's Feedback
+                                    </p>
+                                    <p className="text-[11px] font-bold text-gray-700 leading-relaxed italic">
+                                        "{submittingTask.mentorFeedback}"
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="px-6 pb-8 pt-2">
+                            <button
+                                onClick={saveSubmission}
+                                className="w-full bg-gray-900 text-white h-14 rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all hover:bg-black shadow-xl shadow-gray-200"
+                            >
+                                <ArrowRight size={18} />
+                                기록 제출하기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

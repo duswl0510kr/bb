@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 255, 255, 255;
+  --background-end-rgb: 245, 245, 245;
+  --primary-blue: #007AFF;
+  --ios-gray: #F2F2F7;
+  --ios-gray-2: #E5E5EA;
+  --ios-gray-3: #D1D1D6;
+  --ios-label: #000000;
+  --ios-secondary-label: #3C3C43;
+  --ios-tertiary-label: #3C3C4399;
+}
+
+/* Hide scrollbar globally for iOS-style appearance */
+* {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+*::-webkit-scrollbar {
+  display: none;
+  /* Chrome, Safari and Opera */
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: var(--ios-gray);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.mobile-container {
+  max-width: 430px;
+  width: 100%;
+  height: 100vh;
+  margin: 0 auto;
+  background-color: white;
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.08);
+  /* Hide scrollbar for iOS-style appearance */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+.mobile-container::-webkit-scrollbar {
+  display: none;
+  /* Chrome, Safari and Opera */
+}
+
+.safe-bottom {
+  padding-bottom: 80px;
+}
+
+/* iOS-style card */
+.ios-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.ios-card:active {
+  transform: scale(0.98);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* iOS-style blur */
+.ios-blur {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background-color: rgba(255, 255, 255, 0.72);
+}
+
+/* Custom Scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Smooth scrolling */
+* {
+  scroll-behavior: smooth;
+}
+
+/* iOS button press effect */
+.ios-button-press:active {
+  opacity: 0.6;
+  transform: scale(0.96);
+}
+
+/* iOS separator */
+.ios-separator {
+  height: 0.5px;
+  background: var(--ios-gray-3);
+}
